@@ -1,0 +1,113 @@
+// Noir Detective — data model
+// SQLite for zero-config local dev. Enum-like fields use String (SQLite has no native enums).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  name         String?
+  passwordHash String
+  role         String   @default("USER") // USER | ADMIN
+  points       Int      @default(0)
+  bio          String?
+  avatarUrl    String?
+  location     String?
+
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
+  submissions  Submission[]
+  achievements UserAchievement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Case {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  subtitle    String?
+  summary     String   // short teaser for cards
+  briefing    String   // long-form case briefing (markdown-ish text)
+  difficulty  String   @default("MEDIUM") // EASY | MEDIUM | HARD | EXPERT
+  reward      Int      @default(100)
+  coverImage  String?
+  location    String?
+  dateOccurred String?
+  status      String   @default("OPEN") // OPEN | CLOSED
+  featured    Boolean  @default(false)
+
+  // solution — hidden from players
+  culprit         String
+  solutionSummary String
+
+  evidence    Evidence[]
+  submissions Submission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Evidence {
+  id          String  @id @default(cuid())
+  caseId      String
+  case        Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type        String  // PHOTO | VIDEO | DOCUMENT | FILE | AUDIO
+  title       String
+  description String?
+  url         String
+  fileName    String?
+  order       Int     @default(0)
+
+  createdAt DateTime @default(now())
+}
+
+model Submission {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  suspect   String
+  reasoning String
+  status    String   @default("PENDING") // PENDING | CORRECT | INCORRECT | REVIEWED
+  score     Int      @default(0)
+  feedback  String?
+
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+}
+
+model Achievement {
+  id          String @id @default(cuid())
+  key         String @unique
+  name        String
+  description String
+  icon        String @default("Award")
+  tier        String @default("BRONZE") // BRONZE | SILVER | GOLD | PLATINUM
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id            String @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, achievementId])
+}
